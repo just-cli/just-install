@@ -23,7 +23,7 @@ fn install(blueprint: &Blueprint, req: Option<VersionReq>) -> BoxedResult<()> {
     let mut kernel = Kernel::load();
     let mut fetch = Fetch::new(&blueprint, &mut kernel.versions);
     if fetch.needs_fetch() {
-        fetch.fetch_all_versions().unwrap();
+        fetch.fetch_all_versions()?;
     }
 
     let package = &blueprint.package;
