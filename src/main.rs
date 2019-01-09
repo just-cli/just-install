@@ -5,7 +5,7 @@ use semver::VersionReq;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "fetch")]
+#[structopt(name = "install")]
 struct Opt {
     #[structopt(long = "package")]
     pub package: Option<String>,
