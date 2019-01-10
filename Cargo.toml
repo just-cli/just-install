@@ -5,10 +5,10 @@ authors = ["Randy Schütt <rswhite4@googlemail.com>"]
 edition = "2018"
 
 [dependencies]
-just-core = {path = "../just-core"}
-just-download = {path = "../just-download"}
-just-extract = {path = "../just-extract"}
-just-fetch = { path = "../just-fetch" }
+just-core = { git = "https://github.com/just-cli/just-core" }
+just-download = { git = "https://github.com/just-cli/just-download" }
+just-extract = { git = "https://github.com/just-cli/just-extract" }
+just-fetch = { git = "https://github.com/just-cli/just-fetch" }
 log = "0.4.6"
 semver= "0.9"
 structopt = "0.2.14"
