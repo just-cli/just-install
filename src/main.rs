@@ -1,4 +1,4 @@
-use just_core::kernel::Kernel;
+use just_core::kernel::{Kernel, LocalPackage, PackageShims};
 use just_core::manifest::Manifest;
 use just_core::result::BoxedResult;
 use semver::VersionReq;
@@ -29,7 +29,6 @@ impl<'a> Install<'a> {
     }
 
     fn install(&mut self) -> BoxedResult<()> {
-        use just_core::kernel::LocalPackage;
         use just_download::download;
         use just_extract::extract;
         use just_fetch::Fetch;
@@ -41,7 +40,11 @@ impl<'a> Install<'a> {
         }
 
         let package = &self.manifest.package;
-        if self.kernel.packages.is_installed(package, self.req.clone()) {
+        if self
+            .kernel
+            .packages
+            .is_installed(&package.name, self.req.clone())
+        {
             Ok(())
         } else if let Some((version, path)) = self
             .kernel
@@ -54,13 +57,8 @@ impl<'a> Install<'a> {
                 path,
             };
 
-            self.kernel
-                .packages
-                .add_package(local.package, local.version);
-            self.kernel
-                .versions
-                .add_version(local.package, local.version);
-            self.kernel.create_shims(&local)
+            self.add_package(&local);
+            create_shims(&self.kernel, &local)
         } else {
             let name = package.name.as_str();
 
@@ -77,16 +75,24 @@ impl<'a> Install<'a> {
                 self.kernel
                     .downloads
                     .add_download(&local, &self.kernel.path.download_path);
-                self.kernel
-                    .packages
-                    .add_package(local.package, local.version);
-                self.kernel
-                    .versions
-                    .add_version(local.package, local.version);
-                self.kernel.create_shims(&local)
+                self.add_package(&local);
+                create_shims(&self.kernel, &local)
             })
         }
     }
+
+    fn add_package(&mut self, local: &LocalPackage) {
+        self.kernel
+            .packages
+            .add_package(local.package, local.version);
+        self.kernel
+            .versions
+            .add_version(local.package, local.version);
+    }
+}
+
+fn create_shims(shims: &PackageShims, local: &LocalPackage) -> BoxedResult<()> {
+    shims.create_shims(local)
 }
 
 fn main() {
