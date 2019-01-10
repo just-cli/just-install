@@ -1,4 +1,4 @@
-use just_core::kernel::{Kernel, LocalPackage, PackageShims};
+use just_core::kernel::{Kernel, LocalPackage};
 use just_core::manifest::Manifest;
 use just_core::result::BoxedResult;
 use semver::VersionReq;
@@ -29,6 +29,7 @@ impl<'a> Install<'a> {
     }
 
     fn install(&mut self) -> BoxedResult<()> {
+        use just_core::kernel::PackageShims;
         use just_download::download;
         use just_extract::extract;
         use just_fetch::Fetch;
@@ -40,31 +41,53 @@ impl<'a> Install<'a> {
         }
 
         let package = &self.manifest.package;
+        let pkg_name = &package.name;
+
         if self
             .kernel
             .packages
-            .is_installed(&package.name, self.req.clone())
+            .is_installed(pkg_name, self.req.clone())
         {
+            let version = self
+                .kernel
+                .packages
+                .get_package_version(pkg_name)
+                .expect("No version found although package is installed?!");
+
+            info!("Package {}-{} is already installed", pkg_name, version);
+
             Ok(())
         } else if let Some((version, path)) = self
             .kernel
             .downloads
-            .get_download(&package.name, &self.req.clone().unwrap())
+            .get_download(pkg_name, &self.req.clone().unwrap())
         {
+            info!("Use cached version for installation...");
+
             let local = LocalPackage {
                 package,
                 version,
                 path,
             };
 
-            self.add_package(&local);
-            create_shims(&self.kernel, &local)
-        } else {
-            let name = package.name.as_str();
+            self.kernel
+                .packages
+                .add_package(local.package, local.version);
+            self.kernel
+                .versions
+                .add_version(local.package, local.version);
+            self.kernel.create_shims(&local).and_then(|_| {
+                info!(
+                    "Package {}-{} was successfully installed",
+                    pkg_name, version
+                );
 
-            info!("Downloading package {}...", name);
+                Ok(())
+            })
+        } else {
+            info!("Downloading package {}...", pkg_name);
             let info = download(self.manifest, self.req.clone())?;
-            info!("Extracting package {}...", name);
+            info!("Extracting package {}...", pkg_name);
             extract(&info.uncompressed_path, &info.compressed_path).and_then(|_| {
                 let local = LocalPackage {
                     package,
@@ -75,24 +98,23 @@ impl<'a> Install<'a> {
                 self.kernel
                     .downloads
                     .add_download(&local, &self.kernel.path.download_path);
-                self.add_package(&local);
-                create_shims(&self.kernel, &local)
+                self.kernel
+                    .packages
+                    .add_package(local.package, local.version);
+                self.kernel
+                    .versions
+                    .add_version(local.package, local.version);
+                self.kernel.create_shims(&local).and_then(|_| {
+                    info!(
+                        "Package {}-{} was successfully installed",
+                        pkg_name, info.version
+                    );
+
+                    Ok(())
+                })
             })
         }
     }
-
-    fn add_package(&mut self, local: &LocalPackage) {
-        self.kernel
-            .packages
-            .add_package(local.package, local.version);
-        self.kernel
-            .versions
-            .add_version(local.package, local.version);
-    }
-}
-
-fn create_shims(shims: &PackageShims, local: &LocalPackage) -> BoxedResult<()> {
-    shims.create_shims(local)
 }
 
 fn main() {
