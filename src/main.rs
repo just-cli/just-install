@@ -4,13 +4,12 @@ use just_core::result::BoxedResult;
 use semver::VersionReq;
 use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "install")]
-struct Opt {
-    #[structopt(long = "package")]
-    pub package: Option<String>,
+#[derive(StructOpt)]
+#[structopt(name = "install", about = "...")]
+struct JustInstall {
+    package: String,
     #[structopt(long = "version")]
-    pub version: Option<VersionReq>,
+    version: Option<VersionReq>,
 }
 
 struct Install<'a> {
@@ -28,7 +27,7 @@ impl<'a> Install<'a> {
         }
     }
 
-    fn install(&mut self) -> BoxedResult<()> {
+    fn execute(&mut self) -> BoxedResult<()> {
         use just_core::kernel::PackageShims;
         use just_download::download;
         use just_extract::extract;
@@ -117,24 +116,21 @@ impl<'a> Install<'a> {
     }
 }
 
-fn main() {
+fn install(pkg_name: &str, version: Option<VersionReq>) -> BoxedResult<()> {
     use just_core::manifest::ManifestFiles;
+    use just_core::result::BoxedErr;
 
-    let opt: Opt = Opt::from_args();
-    if let Some(pkg_name) = opt.package {
-        let mut kernel = Kernel::load();
-
-        if let Some(manifest) = ManifestFiles::scan(&kernel).load_manifest(&pkg_name) {
-            let mut install = Install::new(
-                &mut kernel,
-                &manifest,
-                opt.version.or_else(|| Some(VersionReq::any())),
-            );
-            install
-                .install()
-                .unwrap_or_else(|e| panic!("Could not install package {}: {:?}", pkg_name, e));
-        } else {
-            println!("Package {:?} does not exists", pkg_name);
-        }
+    let mut kernel = Kernel::load();
+    if let Some(manifest) = ManifestFiles::scan(&kernel).load_manifest(&pkg_name) {
+        let mut install = Install::new(&mut kernel, &manifest, version);
+        install.execute()
+    } else {
+        BoxedErr::with(format!("Package {:?} does not exists", pkg_name))
     }
+}
+
+fn main() {
+    let opt: JustInstall = JustInstall::from_args();
+    install(&opt.package, opt.version.clone())
+        .unwrap_or_else(|e| panic!("Could not install package {}: {:?}", opt.package, e));
 }
